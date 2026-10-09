@@ -1,0 +1,18 @@
+{
+  "apps": [
+    { "label": "ZEN", "type": "launch", "value": "flatpak run app.zen_browser.zen", "class": "btn-wide" },
+    { "label": "CODE", "type": "launch", "value": "code" },
+    { "label": "TERM", "type": "launch", "value": "gnome-terminal" },
+    { "label": "FILES", "type": "launch", "value": "nautilus" },
+    { "label": "VLC", "type": "launch", "value": "vlc" },
+    { "label": "BLENDER", "type": "launch", "value": "blender" }
+  ],
+  "terminal": [
+    { "label": "RANGER", "type": "cmd", "value": "ranger", "class": "btn-wide btn-tall" },
+    { "label": "NEOFETCH", "type": "cmd", "value": "neofetch", "class": "btn-wide btn-tall" },
+    { "label": "UPDATE", "type": "cmd", "value": "sudo apt update && sudo apt upgrade -y", "class": "btn-full" },
+    { "label": "HTOP", "type": "cmd", "value": "htop" },
+    { "label": "SYSTEM", "type": "cmd", "value": "gnome-system-monitor" },
+    { "label": "CLEAR", "type": "cmd", "value": "clear" }
+  ]
+}

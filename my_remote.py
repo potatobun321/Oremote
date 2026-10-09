@@ -19,9 +19,46 @@ import struct
 import fcntl
 import hmac
 import threading
+import json
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
+
+# ---------- CONFIG LOADER ----------
+DEFAULT_CONFIG = {
+    "apps": [
+        {"label": "ZEN", "type": "launch", "value": "flatpak run app.zen_browser.zen", "class": "btn-wide"},
+        {"label": "CODE", "type": "launch", "value": "code"},
+        {"label": "TERM", "type": "launch", "value": "gnome-terminal"},
+        {"label": "FILES", "type": "launch", "value": "nautilus"},
+        {"label": "VLC", "type": "launch", "value": "vlc"},
+        {"label": "BLENDER", "type": "launch", "value": "blender"}
+    ],
+    "terminal": [
+        {"label": "RANGER", "type": "cmd", "value": "ranger", "class": "btn-wide btn-tall"},
+        {"label": "NEOFETCH", "type": "cmd", "value": "neofetch", "class": "btn-wide btn-tall"},
+        {"label": "UPDATE", "type": "cmd", "value": "sudo apt update && sudo apt upgrade -y", "class": "btn-full"},
+        {"label": "HTOP", "type": "cmd", "value": "htop"},
+        {"label": "SYSTEM", "type": "cmd", "value": "gnome-system-monitor"},
+        {"label": "CLEAR", "type": "cmd", "value": "clear"}
+    ]
+}
+
+
+def load_config():
+    config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return {
+                    "apps": data.get("apps", DEFAULT_CONFIG["apps"]),
+                    "terminal": data.get("terminal", DEFAULT_CONFIG["terminal"])
+                }
+        except Exception as e:
+            print(f"Warning: Failed to load config.json ({e}), using default configuration.")
+    return DEFAULT_CONFIG
+
 # cors_allowed_origins=[] rejects EVERY origin, including the page's own —
 # that can silently break the Socket.IO handshake on some browsers/networks.
 # "*" is fine here because every state-changing action still requires the
@@ -515,7 +552,7 @@ HTML_PAGE = """
 
 <!-- ===== TRACKPAD PAGE ===== -->
 <div class="page active" id="page-pad">
-    <div class="section-title">🖱 Trackpad</div>
+    <div class="section-title">Trackpad</div>
     <div id="touchpad">
         <div class="pad-hint">
             DRAG TO MOVE<br>
@@ -542,14 +579,14 @@ HTML_PAGE = """
 
 <!-- ===== KEYS PAGE ===== -->
 <div class="page" id="page-keys">
-    <div class="section-title">⌨ Keystroke Injection</div>
+    <div class="section-title">Keystroke Injection</div>
     <div class="input-area">
         <input id="customText" type="text" placeholder="TYPE HERE..." autocomplete="off"
                onkeydown="if(event.key==='Enter') sendType()">
         <div class="btn" onclick="sendType()">SEND</div>
     </div>
 
-    <div class="section-title">⌨ Keyboard</div>
+    <div class="section-title">Keyboard</div>
     <div class="grid grid-4">
         <div class="btn" onclick="send('key','space')">SPACE</div>
         <div class="btn" onclick="send('key','Return')">ENTER</div>
@@ -565,7 +602,7 @@ HTML_PAGE = """
         <div class="btn" onclick="send('key','Alt_L+Tab')">ALT+TAB</div>
     </div>
 
-    <div class="section-title">🎵 Playback</div>
+    <div class="section-title">Playback</div>
     <div class="grid grid-4">
         <div class="btn media" onclick="send('key','XF86AudioRaiseVolume')">VOL+</div>
         <div class="btn media" onclick="send('key','XF86AudioLowerVolume')">VOL-</div>
@@ -576,42 +613,36 @@ HTML_PAGE = """
 
 <!-- ===== APPS PAGE ===== -->
 <div class="page" id="page-apps">
-    <div class="section-title">📟 Custom Launch</div>
+    <div class="section-title">Custom Launch</div>
     <div class="input-area">
         <input id="customCmd" type="text" placeholder="COMMAND OR PATH..." autocomplete="off"
                onkeydown="if(event.key==='Enter') sendCmd()">
         <div class="btn danger" onclick="sendCmd()">RUN</div>
     </div>
 
-    <div class="section-title">📂 Applications</div>
+    <div class="section-title">Applications</div>
     <div class="grid grid-3">
-        <div class="btn btn-wide" onclick="send('launch','flatpak run app.zen_browser.zen')">ZEN</div>
-        <div class="btn" onclick="send('launch','code')">CODE</div>
-        <div class="btn" onclick="send('launch','gnome-terminal')">TERM</div>
-        <div class="btn" onclick="send('launch','nautilus')">FILES</div>
-        <div class="btn" onclick="send('launch','vlc')">VLC</div>
-        <div class="btn" onclick="send('launch','blender')">BLENDER</div>
+        {% for app_item in config.apps %}
+        <div class="btn {{ app_item.get('class', '') }}" onclick="send('{{ app_item.type }}', '{{ app_item.value }}')">{{ app_item.label }}</div>
+        {% endfor %}
     </div>
 
-    <div class="section-title">💻 Terminal</div>
+    <div class="section-title">Terminal</div>
     <div class="grid grid-2">
-        <div class="btn btn-wide btn-tall" onclick="send('cmd','ranger')">📁 RANGER</div>
-        <div class="btn btn-wide btn-tall" onclick="send('cmd','neofetch')">🖥 NEOFETCH</div>
-        <div class="btn btn-full" onclick="send('cmd','sudo apt update && sudo apt upgrade -y')">⬆ UPDATE</div>
-        <div class="btn" onclick="send('cmd','htop')">📊 HTOP</div>
-        <div class="btn" onclick="send('cmd','gnome-system-monitor')">📈 SYSTEM</div>
-        <div class="btn" onclick="send('cmd','clear')">🧹 CLEAR</div>
+        {% for item in config.terminal %}
+        <div class="btn {{ item.get('class', '') }}" onclick="send('{{ item.type }}', '{{ item.value }}')">{{ item.label }}</div>
+        {% endfor %}
     </div>
 </div>
 
 <!-- ===== SYSTEM PAGE ===== -->
 <div class="page" id="page-system">
-    <div class="section-title">🛠 System</div>
+    <div class="section-title">System</div>
     <div class="grid grid-2">
         <div class="btn danger" onclick="send('launch','xdotool getactivewindow windowclose')">FORCE QUIT WIN</div>
         <div class="btn danger" onclick="send('key','Super_L+l')">LOCK SCREEN</div>
     </div>
-    <div class="section-title">🔐 Session</div>
+    <div class="section-title">Session</div>
     <div style="font-size:9px; color:#888; line-height:1.8; word-break:break-all;">
         Auth token is embedded in this page and required for every action.
         Keep this URL private — anyone with it and LAN access can control this machine.
@@ -620,7 +651,7 @@ HTML_PAGE = """
 
 <div class="tabbar">
     <div class="tab active" data-page="page-pad" onclick="showPage('page-pad', this)">
-        <div class="icon">🖱</div>TRACKPAD
+        <div class="icon">🖱</div>PAD
     </div>
     <div class="tab" data-page="page-keys" onclick="showPage('page-keys', this)">
         <div class="icon">⌨</div>KEYS
@@ -860,7 +891,8 @@ function sendCmd() {
 # ---------- ROUTES ----------
 @app.route('/')
 def home():
-    return render_template_string(HTML_PAGE, auth_token=AUTH_TOKEN)
+    return render_template_string(HTML_PAGE, auth_token=AUTH_TOKEN, config=load_config())
+
 
 
 @app.route('/run', methods=['POST'])
