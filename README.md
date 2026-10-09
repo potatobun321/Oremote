@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="oremote.png" width="32" height="32" alt="oremote logo" align="center"> 
+  <img src="oremote.png" width="64" height="64" alt="oremote logo" align="center"> 
     <h1> Oremote </h1>
     <p><strong>Control your computer's trackpad, keyboard, applications, and shell commands from your mobile browser</strong></p>
 </div>
