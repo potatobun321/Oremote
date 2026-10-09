@@ -1,4 +1,6 @@
-# <img src="oremote.png" width="32" height="32" alt="oremote logo" align="center"> oremote
+# <img src="oremote.png" width="32" height="32" alt="oremote logo" align="center"> 
+
+  oremote
 
 Control your computer's trackpad, keyboard, applications, and shell commands from your mobile browser.
 
