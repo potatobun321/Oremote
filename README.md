@@ -19,7 +19,7 @@ Control your computer's trackpad, keyboard, applications, and shell commands fro
 ## Requirements
 
 - Python 3.10+
-- **Linux**: `xdotool` (`sudo apt install xdotool`)
+- **Linux**: `xdotool` (`sudo apt install xdotool python3-venv`)
 - **Windows**: PowerShell (built-in)
 - Active graphical desktop session
 
@@ -27,21 +27,30 @@ Control your computer's trackpad, keyboard, applications, and shell commands fro
 
 ## Quick Start
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+1. **Clone & Setup**:
+   ```bash
+   git clone https://github.com/potatobun321/Oremote.git
+   cd Oremote
 
-# Run the server
-python3 my_remote.py
-```
+   python3 -m venv venv
+   source venv/bin/activate       # Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-Open the printed IP URL on your mobile browser while connected to the same network (e.g., `http://192.168.1.x:5001`).
+2. **Run Server**:
+   ```bash
+   python3 my_remote.py
+   ```
+
+3. **Connect from Phone**:
+   - **Same Wi-Fi**: Open the printed IP URL (e.g. `http://192.168.1.x:5001`).
+   - **Cellular / Different Network**: Open `http://<tailscale-ip>:5001` (see [Tailscale Setup](./TAILSCALE_SETUP.md)).
 
 ---
 
 ## Configuration
 
-Customize your launcher buttons by editing `config.json` in the project root:
+Customize launcher buttons by editing `config.json` in the project root:
 
 ```json
 {
@@ -57,9 +66,9 @@ Customize your launcher buttons by editing `config.json` in the project root:
 
 ---
 
-## Remote Access
+## Remote Access (Tailscale)
 
-If your router enables AP/Client isolation or you are on a public network, use [Tailscale](https://tailscale.com) to route traffic securely. See [`TAILSCALE_SETUP.md`](./TAILSCALE_SETUP.md) for details.
+If your router enables AP/Client isolation or you are on cellular data (4G/5G), use [Tailscale](https://tailscale.com) to connect securely without port-forwarding. See [`TAILSCALE_SETUP.md`](./TAILSCALE_SETUP.md) for full instructions.
 
 ---
 
@@ -72,4 +81,3 @@ Created and maintained by [@potatobun321](https://github.com/potatobun321). Desi
 ## License
 
 [MIT](./LICENSE)
-
