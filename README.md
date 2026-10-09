@@ -63,6 +63,13 @@ If your router enables AP/Client isolation or you are on a public network, use [
 
 ---
 
+## About
+
+Created and maintained by [@potatobun321](https://github.com/potatobun321). Designed for minimal OLED mobile screens, low-latency WebRTC trackpad control, and customizable system shortcuts over LAN or Tailscale.
+
+---
+
 ## License
 
 [MIT](./LICENSE)
+
