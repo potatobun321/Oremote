@@ -1,18 +1,38 @@
 {
-  "apps": [
-    { "label": "ZEN", "type": "launch", "value": "flatpak run app.zen_browser.zen", "class": "btn-wide" },
-    { "label": "CODE", "type": "launch", "value": "code" },
-    { "label": "TERM", "type": "launch", "value": "gnome-terminal" },
-    { "label": "FILES", "type": "launch", "value": "nautilus" },
-    { "label": "VLC", "type": "launch", "value": "vlc" },
-    { "label": "BLENDER", "type": "launch", "value": "blender" }
-  ],
-  "terminal": [
-    { "label": "RANGER", "type": "cmd", "value": "ranger", "class": "btn-wide btn-tall" },
-    { "label": "NEOFETCH", "type": "cmd", "value": "neofetch", "class": "btn-wide btn-tall" },
-    { "label": "UPDATE", "type": "cmd", "value": "sudo apt update && sudo apt upgrade -y", "class": "btn-full" },
-    { "label": "HTOP", "type": "cmd", "value": "htop" },
-    { "label": "SYSTEM", "type": "cmd", "value": "gnome-system-monitor" },
-    { "label": "CLEAR", "type": "cmd", "value": "clear" }
-  ]
+  "linux": {
+    "apps": [
+      { "label": "ZEN", "type": "launch", "value": "flatpak run app.zen_browser.zen", "class": "btn-wide" },
+      { "label": "CODE", "type": "launch", "value": "code" },
+      { "label": "TERM", "type": "launch", "value": "gnome-terminal" },
+      { "label": "FILES", "type": "launch", "value": "nautilus" },
+      { "label": "VLC", "type": "launch", "value": "vlc" },
+      { "label": "BLENDER", "type": "launch", "value": "blender" }
+    ],
+    "terminal": [
+      { "label": "RANGER", "type": "cmd", "value": "ranger", "class": "btn-wide btn-tall" },
+      { "label": "NEOFETCH", "type": "cmd", "value": "neofetch", "class": "btn-wide btn-tall" },
+      { "label": "UPDATE", "type": "cmd", "value": "sudo apt update && sudo apt upgrade -y", "class": "btn-full" },
+      { "label": "HTOP", "type": "cmd", "value": "htop" },
+      { "label": "SYSTEM", "type": "cmd", "value": "gnome-system-monitor" },
+      { "label": "CLEAR", "type": "cmd", "value": "clear" }
+    ]
+  },
+  "windows": {
+    "apps": [
+      { "label": "CODE", "type": "launch", "value": "code", "class": "btn-wide" },
+      { "label": "TERM", "type": "launch", "value": "powershell" },
+      { "label": "FILES", "type": "launch", "value": "explorer" },
+      { "label": "NOTEPAD", "type": "launch", "value": "notepad" },
+      { "label": "CALC", "type": "launch", "value": "calc" },
+      { "label": "TASKMGR", "type": "launch", "value": "taskmgr" }
+    ],
+    "terminal": [
+      { "label": "SYSINFO", "type": "cmd", "value": "systeminfo", "class": "btn-wide btn-tall" },
+      { "label": "IPCONFIG", "type": "cmd", "value": "ipconfig", "class": "btn-wide btn-tall" },
+      { "label": "WINGET", "type": "cmd", "value": "winget upgrade", "class": "btn-full" },
+      { "label": "TASKLIST", "type": "cmd", "value": "tasklist" },
+      { "label": "NETSTAT", "type": "cmd", "value": "netstat -ano" },
+      { "label": "CLS", "type": "cmd", "value": "cls" }
+    ]
+  }
 }

@@ -4,10 +4,9 @@
     <p><strong>Control your computer's trackpad, keyboard, applications, and shell commands from your mobile browser</strong></p>
 </div>
 
-
 ---
 
-> **Note:** Early release (v0.1.0). Under active development.
+> **Note:** Early release (v0.1.0). Cross-platform support for Linux & Windows.
 
 ---
 
@@ -15,8 +14,8 @@
 
 - **Trackpad**: Real-time cursor movement over WebRTC DataChannel with WebSocket fallback. Tap to click, two-finger tap for right-click, two-finger drag to scroll.
 - **Keyboard & Media**: Keystroke injection, navigation keys, volume control, and playback toggles.
-- **App Launcher**: Configurable app shortcuts and terminal command buttons via `config.json`.
-- **Interface Selection**: Automatically detects and prioritizes active Wi-Fi and Ethernet adapters.
+- **App Launcher**: Configurable app shortcuts and terminal command buttons via `config.json` with OS-specific profiles.
+- **Interface Selection**: Automatically detects and prioritizes active Wi-Fi and Ethernet adapters on both Windows and Linux.
 - **Token Security**: Dynamic 32-byte session token with IP rate-limiting protection.
 
 ---
@@ -25,12 +24,14 @@
 
 - Python 3.10+
 - **Linux**: `xdotool` (`sudo apt install xdotool python3-venv`)
-- **Windows**: PowerShell (built-in)
+- **Windows**: Built-in Windows User32 API (no extra tools required)
 - Active graphical desktop session
 
 ---
 
 ## Quick Start
+
+### Linux
 
 1. **Clone & Setup**:
    ```bash
@@ -38,7 +39,7 @@
    cd Oremote
 
    python3 -m venv venv
-   source venv/bin/activate       # Windows: venv\Scripts\activate
+   source venv/bin/activate
    pip install -r requirements.txt
    ```
 
@@ -47,27 +48,68 @@
    python3 my_remote.py
    ```
 
-3. **Connect from Phone**:
-   - **Same Wi-Fi**: Open the printed IP URL (e.g. `http://192.168.1.x:5001`).
-   - **Cellular / Different Network**: Open `http://<tailscale-ip>:5001` (see [Tailscale Setup](./TAILSCALE_SETUP.md)).
+### Windows
+
+1. **Clone & Setup** (PowerShell or Command Prompt):
+   ```powershell
+   git clone https://github.com/potatobun321/Oremote.git
+   cd Oremote
+
+   python -m venv venv
+   .\venv\Scripts\Activate.ps1       # Or `venv\Scripts\activate.bat` in CMD
+   pip install -r requirements.txt
+   ```
+
+   > **Note for PowerShell execution policy**: If `Activate.ps1` is blocked, run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` in PowerShell.
+
+2. **Run Server**:
+   ```powershell
+   python my_remote.py
+   ```
+
+### Connect from Phone
+
+- **Same Wi-Fi**: Open the printed IP URL (e.g. `http://192.168.1.x:5001`).
+- **Cellular / Different Network**: Open `http://<tailscale-ip>:5001` (see [Tailscale Setup](./TAILSCALE_SETUP.md)).
 
 ---
 
 ## Configuration
 
-Customize launcher buttons by editing `config.json` in the project root:
+Customize launcher buttons by editing `config.json` in the project root. `config.json` supports separate sections for `"windows"` and `"linux"`:
 
 ```json
 {
-  "apps": [
-    { "label": "CODE", "type": "launch", "value": "code" },
-    { "label": "TERM", "type": "launch", "value": "gnome-terminal" }
-  ],
-  "terminal": [
-    { "label": "HTOP", "type": "cmd", "value": "htop" }
-  ]
+  "windows": {
+    "apps": [
+      { "label": "CODE", "type": "launch", "value": "code", "class": "btn-wide" },
+      { "label": "TERM", "type": "launch", "value": "powershell" },
+      { "label": "FILES", "type": "launch", "value": "explorer" }
+    ],
+    "terminal": [
+      { "label": "SYSINFO", "type": "cmd", "value": "systeminfo" },
+      { "label": "IPCONFIG", "type": "cmd", "value": "ipconfig" }
+    ]
+  },
+  "linux": {
+    "apps": [
+      { "label": "CODE", "type": "launch", "value": "code" },
+      { "label": "TERM", "type": "launch", "value": "gnome-terminal" }
+    ],
+    "terminal": [
+      { "label": "HTOP", "type": "cmd", "value": "htop" }
+    ]
+  }
 }
 ```
+
+---
+
+## Troubleshooting & Firewall
+
+- **Windows Defender Firewall**: When running on Windows for the first time, Windows Defender Firewall may prompt you to allow Python network access. Ensure **Private networks** is checked. If connections time out, verify port `5001` is allowed through Windows Firewall.
+- **Linux Firewall**: Ensure `ufw` or `firewalld` permits incoming traffic on port `5001` (`sudo ufw allow 5001/tcp`).
+- **Client/AP Isolation**: Public Wi-Fi networks (cafes, hotels, universities) often block device-to-device connections. Use [Tailscale](./TAILSCALE_SETUP.md) for direct connectivity in these environments.
 
 ---
 

@@ -16,16 +16,20 @@ import secrets
 import re
 import asyncio
 import struct
-import fcntl
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 import hmac
 import threading
 import json
+import ctypes
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 
 # ---------- CONFIG LOADER ----------
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG_LINUX = {
     "apps": [
         {"label": "ZEN", "type": "launch", "value": "flatpak run app.zen_browser.zen", "class": "btn-wide"},
         {"label": "CODE", "type": "launch", "value": "code"},
@@ -44,20 +48,54 @@ DEFAULT_CONFIG = {
     ]
 }
 
+DEFAULT_CONFIG_WINDOWS = {
+    "apps": [
+        {"label": "CODE", "type": "launch", "value": "code", "class": "btn-wide"},
+        {"label": "TERM", "type": "launch", "value": "powershell"},
+        {"label": "FILES", "type": "launch", "value": "explorer"},
+        {"label": "NOTEPAD", "type": "launch", "value": "notepad"},
+        {"label": "CALC", "type": "launch", "value": "calc"},
+        {"label": "TASKMGR", "type": "launch", "value": "taskmgr"}
+    ],
+    "terminal": [
+        {"label": "SYSINFO", "type": "cmd", "value": "systeminfo", "class": "btn-wide btn-tall"},
+        {"label": "IPCONFIG", "type": "cmd", "value": "ipconfig", "class": "btn-wide btn-tall"},
+        {"label": "WINGET", "type": "cmd", "value": "winget upgrade", "class": "btn-full"},
+        {"label": "TASKLIST", "type": "cmd", "value": "tasklist"},
+        {"label": "NETSTAT", "type": "cmd", "value": "netstat -ano"},
+        {"label": "CLS", "type": "cmd", "value": "cls"}
+    ]
+}
+
+DEFAULT_CONFIG = DEFAULT_CONFIG_WINDOWS if platform.system() == "Windows" else DEFAULT_CONFIG_LINUX
+
 
 def load_config():
     config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+    default_cfg = DEFAULT_CONFIG_WINDOWS if platform.system() == "Windows" else DEFAULT_CONFIG_LINUX
     if os.path.exists(config_path):
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+                if platform.system() == "Windows" and "windows" in data:
+                    win_data = data["windows"]
+                    return {
+                        "apps": win_data.get("apps", default_cfg["apps"]),
+                        "terminal": win_data.get("terminal", default_cfg["terminal"])
+                    }
+                elif platform.system() != "Windows" and "linux" in data:
+                    linux_data = data["linux"]
+                    return {
+                        "apps": linux_data.get("apps", default_cfg["apps"]),
+                        "terminal": linux_data.get("terminal", default_cfg["terminal"])
+                    }
                 return {
-                    "apps": data.get("apps", DEFAULT_CONFIG["apps"]),
-                    "terminal": data.get("terminal", DEFAULT_CONFIG["terminal"])
+                    "apps": data.get("apps", default_cfg["apps"]),
+                    "terminal": data.get("terminal", default_cfg["terminal"])
                 }
         except Exception as e:
             print(f"Warning: Failed to load config.json ({e}), using default configuration.")
-    return DEFAULT_CONFIG
+    return default_cfg
 
 # cors_allowed_origins=[] rejects EVERY origin, including the page's own —
 # that can silently break the Socket.IO handshake on some browsers/networks.
@@ -156,34 +194,58 @@ IGNORED_IFACE_PREFIXES = (
 
 def get_all_ips():
     ips = []
-    try:
-        with open('/proc/net/dev') as f:
-            lines = f.readlines()[2:]
-            for line in lines:
-                iface = line.split(':')[0].strip()
-                if iface == 'lo' or iface.startswith(IGNORED_IFACE_PREFIXES):
-                    continue
-                try:
-                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    ip = socket.inet_ntoa(fcntl.ioctl(
-                        s.fileno(),
-                        0x8915,  # SIOCGIFADDR
-                        struct.pack('256s', iface.encode('utf-8')[:15])
-                    )[20:24])
-                    ips.append((iface, ip))
-                    s.close()
-                except Exception:
-                    pass
-    except Exception:
-        pass
-    # Prefer real Wi-Fi/Ethernet adapter names first (wlan, wl*, eth, en*)
+    if fcntl and os.path.exists('/proc/net/dev'):
+        try:
+            with open('/proc/net/dev') as f:
+                lines = f.readlines()[2:]
+                for line in lines:
+                    iface = line.split(':')[0].strip()
+                    if iface == 'lo' or iface.startswith(IGNORED_IFACE_PREFIXES):
+                        continue
+                    try:
+                        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        ip = socket.inet_ntoa(fcntl.ioctl(
+                            s.fileno(),
+                            0x8915,  # SIOCGIFADDR
+                            struct.pack('256s', iface.encode('utf-8')[:15])
+                        )[20:24])
+                        ips.append((iface, ip))
+                        s.close()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    if not ips:
+        try:
+            primary_ip = None
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                primary_ip = s.getsockname()[0]
+                s.close()
+            except Exception:
+                pass
+
+            hostname = socket.gethostname()
+            _, _, host_ips = socket.gethostbyname_ex(hostname)
+            valid_ips = [ip for ip in host_ips if not ip.startswith('127.')]
+            if primary_ip and primary_ip not in valid_ips:
+                valid_ips.insert(0, primary_ip)
+            for idx, ip in enumerate(valid_ips):
+                label = "Primary" if ip == primary_ip else f"Adapter {idx+1}"
+                ips.append((label, ip))
+        except Exception:
+            pass
+
+    # Prefer real Wi-Fi/Ethernet adapter names first (wlan, wl*, eth, en*, Primary)
     # so the FIRST printed URL is the one that's actually reachable, even
     # on a machine with several adapters.
     def _priority(item):
-        iface = item[0]
-        if iface.startswith(('wl', 'wifi')):
+        iface = item[0].lower()
+        if iface == 'primary' or iface.startswith(('wl', 'wifi')):
             return 0
-        if iface.startswith(('eth', 'en')):
+        if iface.startswith(('eth', 'en', 'adapter')):
             return 1
         return 2
     ips.sort(key=_priority)
@@ -204,10 +266,97 @@ def get_local_ip():
         return socket.gethostbyname(socket.gethostname())
 
 
+# ---------- WINDOWS NATIVE INPUT BACKEND ----------
+if system == "Windows":
+    MOUSEEVENTF_MOVE = 0x0001
+    MOUSEEVENTF_LEFTDOWN = 0x0002
+    MOUSEEVENTF_LEFTUP = 0x0004
+    MOUSEEVENTF_RIGHTDOWN = 0x0008
+    MOUSEEVENTF_RIGHTUP = 0x0010
+    MOUSEEVENTF_MIDDLEDOWN = 0x0020
+    MOUSEEVENTF_MIDDLEUP = 0x0040
+    MOUSEEVENTF_WHEEL = 0x0800
+    WHEEL_DELTA = 120
+
+    KEYEVENTF_EXTENDEDKEY = 0x0001
+    KEYEVENTF_KEYUP = 0x0002
+    KEYEVENTF_UNICODE = 0x0004
+
+    VK_MAP = {
+        "space": 0x20,
+        "Return": 0x0D,
+        "BackSpace": 0x08,
+        "Escape": 0x1B,
+        "Left": 0x25,
+        "Up": 0x26,
+        "Right": 0x27,
+        "Down": 0x28,
+        "Super_L": 0x5B,     # Windows Key
+        "Alt_L": 0x12,       # Alt
+        "Tab": 0x09,
+        "XF86AudioRaiseVolume": 0xAF,
+        "XF86AudioLowerVolume": 0xAE,
+        "XF86AudioMute": 0xAD,
+        "XF86AudioPlay": 0xB3,
+        "F4": 0x73,
+    }
+
+    def _win_mouse_move(dx, dy):
+        ctypes.windll.user32.mouse_event(MOUSEEVENTF_MOVE, int(dx), int(dy), 0, 0)
+
+    def _win_mouse_click(btn):
+        btn = str(btn)
+        if btn == "1":    # Left click
+            ctypes.windll.user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+            ctypes.windll.user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+        elif btn == "2":  # Middle click
+            ctypes.windll.user32.mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0)
+            ctypes.windll.user32.mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0)
+        elif btn == "3":  # Right click
+            ctypes.windll.user32.mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0)
+            ctypes.windll.user32.mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0)
+        elif btn == "4":  # Wheel up (scroll up)
+            ctypes.windll.user32.mouse_event(MOUSEEVENTF_WHEEL, 0, 0, WHEEL_DELTA, 0)
+        elif btn == "5":  # Wheel down (scroll down)
+            ctypes.windll.user32.mouse_event(MOUSEEVENTF_WHEEL, 0, 0, -WHEEL_DELTA, 0)
+
+    def _win_key_press(vk, extended=False):
+        flags = KEYEVENTF_EXTENDEDKEY if extended else 0
+        ctypes.windll.user32.keybd_event(vk, 0, flags, 0)
+        ctypes.windll.user32.keybd_event(vk, 0, flags | KEYEVENTF_KEYUP, 0)
+
+    def _win_send_key(key_name):
+        if key_name == "Alt_L+Tab":
+            ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)
+            ctypes.windll.user32.keybd_event(0x09, 0, 0, 0)
+            ctypes.windll.user32.keybd_event(0x09, 0, KEYEVENTF_KEYUP, 0)
+            ctypes.windll.user32.keybd_event(0x12, 0, KEYEVENTF_KEYUP, 0)
+        elif key_name == "Super_L+l":
+            ctypes.windll.user32.LockWorkStation()
+        elif key_name in VK_MAP:
+            vk = VK_MAP[key_name]
+            extended = key_name in (
+                "Left", "Up", "Right", "Down", "Super_L",
+                "XF86AudioRaiseVolume", "XF86AudioLowerVolume", "XF86AudioMute", "XF86AudioPlay"
+            )
+            _win_key_press(vk, extended=extended)
+
+    def _win_type_text(text):
+        for char in text:
+            code = ord(char)
+            ctypes.windll.user32.keybd_event(0, code, KEYEVENTF_UNICODE, 0)
+            ctypes.windll.user32.keybd_event(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0)
+
+    def _win_close_active_window():
+        ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)
+        ctypes.windll.user32.keybd_event(0x73, 0, 0, 0)
+        ctypes.windll.user32.keybd_event(0x73, 0, KEYEVENTF_KEYUP, 0)
+        ctypes.windll.user32.keybd_event(0x12, 0, KEYEVENTF_KEYUP, 0)
+
+
 # ---------- INPUT VALIDATION ----------
 VALID_ACTIONS = {"key", "type", "launch", "cmd", "click"}
 SAFE_KEY_RE = re.compile(r'^[a-zA-Z0-9_+]+$')
-BLOCKED_TYPE_CHARS = re.compile(r'[;|&`$(){}!\n\r]')
 
 
 def validate_input(action_type, value):
@@ -216,8 +365,6 @@ def validate_input(action_type, value):
     if action_type not in VALID_ACTIONS:
         return False
     if action_type == "key" and not SAFE_KEY_RE.match(value):
-        return False
-    if action_type == "type" and system == "Windows" and BLOCKED_TYPE_CHARS.search(value):
         return False
     if action_type == "click" and not value.isdigit():
         return False
@@ -230,15 +377,18 @@ def execute_action(action_type, value):
         return "INVALID"
     if system == "Windows":
         if action_type == "key":
-            subprocess.run(["powershell", "-Command",
-                f"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{{{value}}}')"])
+            _win_send_key(value)
         elif action_type == "type":
-            subprocess.run(["powershell", "-Command",
-                f"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{value}')"])
+            _win_type_text(value)
+        elif action_type == "click":
+            _win_mouse_click(value)
         elif action_type == "launch":
-            subprocess.Popen(["start", value], shell=True)
+            if value.strip() == "xdotool getactivewindow windowclose":
+                _win_close_active_window()
+            else:
+                subprocess.Popen(f'start "" {value}', shell=True)
         elif action_type == "cmd":
-            subprocess.Popen(["start", "cmd", "/k", value], shell=True)
+            subprocess.Popen(f'start "" cmd /k {value}', shell=True)
     else:  # Linux
         if action_type == "key":
             subprocess.run(["xdotool", "key", value])
@@ -266,7 +416,10 @@ def handle_move(data):
         dy = int(data.get('dy', 0))
     except (TypeError, ValueError):
         return
-    subprocess.run(["xdotool", "mousemove_relative", "--", str(dx), str(dy)])
+    if system == "Windows":
+        _win_mouse_move(dx, dy)
+    else:
+        subprocess.run(["xdotool", "mousemove_relative", "--", str(dx), str(dy)])
 
 
 # ---------- WEBRTC SIGNALING ----------
@@ -308,8 +461,11 @@ def handle_webrtc_offer(data):
                         # separate HTTP path) unaffected.
                         s, dx, dy = struct.unpack('<Ihh', message)
                         if s == session_id_int:
-                            subprocess.run(["xdotool", "mousemove_relative",
-                                            "--", str(dx), str(dy)])
+                            if system == "Windows":
+                                _win_mouse_move(dx, dy)
+                            else:
+                                subprocess.run(["xdotool", "mousemove_relative",
+                                                "--", str(dx), str(dy)])
 
         @pc.on("icecandidate")
         def on_ice_candidate(candidate):
@@ -942,4 +1098,4 @@ if __name__ == '__main__':
     print("    the router/hotspot itself, or avoided with a private")
     print("    overlay network like Tailscale or ZeroTier (see README).")
     print("Press Ctrl+C to stop")
-    socketio.run(app, host='0.0.0.0', port=port, debug=False)
+    socketio.run(app, host='0.0.0.0', port=port, debug=False, allow_unsafe_werkzeug=True)
